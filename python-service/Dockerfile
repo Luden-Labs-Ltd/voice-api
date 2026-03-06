@@ -20,4 +20,5 @@ COPY python-service/main.py ./
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# main.py reads PORT (Railway) then PYTHON_PORT (.env fallback) then 8000.
+CMD ["python", "main.py"]

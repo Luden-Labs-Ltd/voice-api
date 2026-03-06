@@ -4,6 +4,11 @@ FastAPI service wrapping the readscore analysis pipeline.
 Internal service — not exposed publicly.
 POST /analyze  accepts multipart form-data: text, lang (optional), audio (file)
 GET  /health   liveness check
+
+Port and model are configured via environment variables:
+  PORT          — set by Railway automatically (takes priority)
+  PYTHON_PORT   — local/compose fallback (default 8000)
+  WHISPER_MODEL — Whisper model size (default "base")
 """
 
 import os
@@ -12,6 +17,8 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 
 app = FastAPI(title="readscore-python-service")
 
@@ -51,7 +58,7 @@ async def analyze(
             evaluate_reading,
         )
 
-        config = EvaluationConfig()
+        config = EvaluationConfig(whisper_model=WHISPER_MODEL)
         report = evaluate_reading(temp_path, text, config, lang=lang)
         report = convert_to_serializable(report)
         return JSONResponse(content=report)
@@ -69,3 +76,11 @@ async def analyze(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Railway injects PORT; PYTHON_PORT is the local/compose fallback from .env.
+    port = int(os.getenv("PORT") or os.getenv("PYTHON_PORT") or 8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)

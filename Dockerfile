@@ -1,20 +1,10 @@
-FROM python:3.11-slim
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy project files
-COPY pyproject.toml README.md ./
-COPY readscore/ ./readscore/
-COPY tests/ ./tests/
-
-# Install package with all dependencies
-RUN pip install --no-cache-dir -e ".[full,dev]"
-
-# Default command: show help
-CMD ["readscore", "--help"]
+# ──────────────────────────────────────────────────────────────────────────────
+# This file is NOT a web-server and must NOT be used as a Railway deploy target.
+#
+# Railway service Dockerfiles:
+#   Public web service (node-api)      →  node-api/Dockerfile
+#   Internal audio service (python)    →  python-service/Dockerfile
+#   CLI / local dev utility            →  Dockerfile.cli
+# ──────────────────────────────────────────────────────────────────────────────
+FROM busybox
+RUN echo "ERROR: Do not deploy this Dockerfile. Use node-api/Dockerfile or python-service/Dockerfile." && exit 1

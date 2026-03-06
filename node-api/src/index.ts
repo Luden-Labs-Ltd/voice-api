@@ -1,8 +1,18 @@
+// Load .env before reading any process.env values.
+// In Docker / Railway the variables are already injected, so this is a no-op.
+import "dotenv/config";
+
 import fs from "fs/promises";
 import path from "path";
 
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
+
+// Railway injects PORT; NODE_PORT is the local-dev fallback from .env.
+const PORT = parseInt(
+  process.env.PORT || process.env.NODE_PORT || "3000",
+  10
+);
 
 const PYTHON_SERVICE_URL =
   process.env.PYTHON_SERVICE_URL || "http://python-service:8000";
@@ -12,9 +22,9 @@ const PYTHON_SERVICE_URL =
 const FRONTEND_DIR =
   process.env.FRONTEND_DIR || path.join(__dirname, "..", "frontend");
 
-const PORT = parseInt(process.env.PORT || "3000", 10);
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({ logger: { level: LOG_LEVEL } });
 
 fastify.register(multipart, {
   limits: {

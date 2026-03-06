@@ -202,6 +202,51 @@ pytest
 pytest --cov=readscore --cov-report=term-missing
 ```
 
+## Environment Variables
+
+Configuration is centralised in a `.env` file for local development and set
+directly in each service's environment for Railway.
+
+### Quick start (local)
+
+```bash
+cp .env.example .env
+# Edit .env if you want non-default values, then:
+docker compose up --build
+```
+
+### Variable reference
+
+| Variable | Default | Used by | Purpose |
+|---|---|---|---|
+| `NODE_PORT` | `3000` | node-api | Port the Node API listens on locally |
+| `PORT` | — | node-api, python-service | Injected automatically by Railway; takes priority over `NODE_PORT` / `PYTHON_PORT` |
+| `PYTHON_SERVICE_URL` | `http://python-service:8000` | node-api | URL node-api uses to reach the Python service |
+| `PYTHON_PORT` | `8000` | python-service | Port the Python service listens on locally |
+| `WHISPER_MODEL` | `base` | python-service | Whisper model size (`tiny` → `large-v3`) |
+| `LOG_LEVEL` | `info` | node-api | Fastify log level (`trace` `debug` `info` `warn` `error`) |
+
+### Configuring for Railway
+
+Railway injects `PORT` into every service automatically — you do **not** need to
+set `NODE_PORT` or `PYTHON_PORT` there.
+
+Variables to set in each Railway service:
+
+**node-api**
+```
+PYTHON_SERVICE_URL=http://<python-service-private-domain>:<port>
+LOG_LEVEL=info
+```
+
+**python-service**
+```
+WHISPER_MODEL=base
+```
+
+`PYTHON_SERVICE_URL` must point to the private network address Railway assigns to
+the python-service (shown in the service's "Networking → Private" tab).
+
 ## License
 
 MIT
