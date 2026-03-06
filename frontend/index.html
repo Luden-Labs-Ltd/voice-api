@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReadScore - Reading Analysis</title>
+    <style>
+        /* Base styling */
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 { color: #34495e; margin-top: 30px; }
+        h3 { color: #555; margin-top: 20px; }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-record { background: #e74c3c; color: white; }
+        .btn-record:hover:not(:disabled) { background: #c0392b; }
+        .btn-record.recording { background: #c0392b; animation: pulse 1s infinite; }
+        .btn-stop { background: #95a5a6; color: white; }
+        .btn-stop:hover:not(:disabled) { background: #7f8c8d; }
+        .btn-analyze { background: #3498db; color: white; }
+        .btn-analyze:hover:not(:disabled) { background: #2980b9; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.success { background: #d4edda; color: #155724; }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .result-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        .result-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .result-card .value { font-size: 24px; font-weight: bold; color: #2c3e50; }
+        .result-card .unit { font-size: 12px; color: #666; }
+
+        /* Phrase display with colored tokens */
+        .phrase-display {
+            font-size: 20px;
+            line-height: 2.2;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .word-token {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 2px;
+            border-radius: 4px;
+            position: relative;
+            cursor: default;
+        }
+        /* Correct word (ok) */
+        .word-token.ok { background: #d4edda; color: #155724; }
+        /* Substitution (wrong word) */
+        .word-token.sub { background: #f8d7da; color: #721c24; }
+        /* Deletion (omitted) */
+        .word-token.del {
+            background: #e9ecef;
+            color: #6c757d;
+            text-decoration: line-through;
+        }
+        /* Insertion (extra word) */
+        .word-token.ins {
+            background: #fff3cd;
+            color: #856404;
+            font-size: 14px;
+            padding: 1px 5px;
+            border: 1px dashed #ffc107;
+        }
+        /* Punctuation */
+        .punct-token {
+            display: inline-block;
+            font-size: 20px;
+            margin: 0 2px;
+            position: relative;
+        }
+        /* Pause issues on punctuation */
+        .punct-token.pause-short {
+            border-bottom: 3px solid #f1c40f;
+        }
+        .punct-token.pause-long {
+            border-bottom: 3px solid #9b59b6;
+        }
+        .punct-token.pause-ok {
+            border-bottom: 2px solid #27ae60;
+        }
+        /* Prosody issues (wavy underline for ? and !) */
+        .word-token.prosody-issue {
+            text-decoration: underline wavy #3498db;
+            text-underline-offset: 4px;
+        }
+        /* Tooltip */
+        .word-token[data-tooltip]:hover::after,
+        .punct-token[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .legend-box.ok { background: #d4edda; }
+        .legend-box.sub { background: #f8d7da; }
+        .legend-box.del { background: #e9ecef; text-decoration: line-through; }
+        .legend-box.ins { background: #fff3cd; border: 1px dashed #ffc107; }
+        .legend-line { height: 3px; width: 20px; display: inline-block; }
+        .legend-line.pause-short { background: #f1c40f; }
+        .legend-line.pause-long { background: #9b59b6; }
+        .legend-line.prosody {
+            background: transparent;
+            border-bottom: 2px wavy #3498db;
+        }
+
+        /* Event items */
+        .event-item {
+            background: #f8f9fa;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 4px solid #9b59b6;
+        }
+        .event-item.rising { border-color: #27ae60; }
+        .event-item.falling { border-color: #e74c3c; }
+        .event-item.flat { border-color: #f39c12; }
+        .event-item.ok { border-color: #27ae60; }
+        .event-item.too_short { border-color: #f1c40f; }
+        .event-item.too_long { border-color: #9b59b6; }
+
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            max-height: 300px;
+        }
+        .hidden { display: none; }
+        .loading {
+            display: inline-block;
+            width: 20px; height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Language selector */
+        .lang-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .lang-selector label { font-weight: 500; }
+        .lang-selector select {
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
+        .lang-info {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
+        }
+
+        /* RTL support for Hebrew */
+        .phrase-display.rtl {
+            direction: rtl;
+            unicode-bidi: plaintext;
+            text-align: right;
+        }
+        .phrase-display.rtl .word-token,
+        .phrase-display.rtl .punct-token {
+            direction: rtl;
+        }
+        textarea.rtl {
+            direction: rtl;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>ReadScore</h1>
+    <p>Analyze your reading pronunciation, fluency, and prosody.</p>
+
+    <!-- Input Section -->
+    <div class="section">
+        <h2>1. Reference Text</h2>
+        <div class="lang-selector">
+            <label for="langSelect">Language:</label>
+            <select id="langSelect">
+                <option value="en">English</option>
+                <option value="ru">Русский (Russian)</option>
+                <option value="he">עברית (Hebrew)</option>
+                <option value="auto">Auto-detect</option>
+            </select>
+            <span class="lang-info" id="langInfo"></span>
+        </div>
+        <textarea id="referenceText" placeholder="Enter the text you will read aloud...">Hello. How are you?</textarea>
+    </div>
+
+    <div class="section">
+        <h2>2. Record Your Reading</h2>
+        <p>Click "Start Recording", read the text aloud, then click "Stop Recording".</p>
+        <button id="btnRecord" class="btn-record">Start Recording</button>
+        <button id="btnStop" class="btn-stop" disabled>Stop Recording</button>
+        <div id="recordingStatus" class="status info hidden"></div>
+        <audio id="audioPlayback" controls class="hidden" style="width: 100%; margin-top: 10px;"></audio>
+    </div>
+
+    <div class="section">
+        <h2>3. Analyze</h2>
+        <button id="btnAnalyze" class="btn-analyze" disabled>Analyze Reading</button>
+        <div id="analyzeStatus" class="status hidden"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="section hidden">
+        <h2>Results</h2>
+
+        <!-- Phrase Display with Colored Tokens -->
+        <h3>Your Reading</h3>
+        <div id="phraseDisplay" class="phrase-display"></div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item"><span class="legend-box ok"></span> Correct</div>
+            <div class="legend-item"><span class="legend-box sub"></span> Wrong word</div>
+            <div class="legend-item"><span class="legend-box del">ab</span> Omitted</div>
+            <div class="legend-item"><span class="legend-box ins"></span> Extra word</div>
+            <div class="legend-item"><span class="legend-line pause-short"></span> Pause too short</div>
+            <div class="legend-item"><span class="legend-line pause-long"></span> Pause too long</div>
+            <div class="legend-item"><span class="legend-line prosody"></span> Intonation issue</div>
+        </div>
+
+        <!-- Summary Cards -->
+        <h3>Scores</h3>
+        <div class="results-grid">
+            <div class="result-card">
+                <h4>Accuracy (WER)</h4>
+                <span id="resultWER" class="value">--</span>
+                <span class="unit">%</span>
+            </div>
+            <div class="result-card">
+                <h4>Correct Words</h4>
+                <span id="resultCorrect" class="value">--</span>
+                <span class="unit" id="resultTotal">/ --</span>
+            </div>
+            <div class="result-card">
+                <h4>Speaking Rate</h4>
+                <span id="resultWPM" class="value">--</span>
+                <span class="unit">WPM</span>
+            </div>
+            <div class="result-card">
+                <h4>Fluency</h4>
+                <span id="resultFluency" class="value">--</span>
+                <span class="unit">/ 100</span>
+            </div>
+            <div class="result-card">
+                <h4>Prosody</h4>
+                <span id="resultProsody" class="value">--</span>
+                <span class="unit">/ 100</span>
+            </div>
+            <div class="result-card">
+                <h4>Pauses</h4>
+                <span id="resultPauses" class="value">--</span>
+                <span class="unit">/ 100</span>
+            </div>
+        </div>
+
+        <!-- Punctuation Pauses -->
+        <div id="pausesSection" class="hidden">
+            <h3>Punctuation Pauses</h3>
+            <div id="pauseEvents"></div>
+        </div>
+
+        <!-- Punctuation Prosody Events -->
+        <div id="punctuationSection" class="hidden">
+            <h3>Intonation (? / !)</h3>
+            <div id="punctuationEvents"></div>
+        </div>
+
+        <!-- Debug Info -->
+        <h3>Debug</h3>
+        <p id="debugInfo" style="font-family: monospace; font-size: 11px; color: #666;"></p>
+
+        <!-- Raw JSON -->
+        <details>
+            <summary style="cursor: pointer; color: #666;">Raw JSON Report</summary>
+            <pre id="rawJSON"></pre>
+        </details>
+    </div>
+
+    <script>
+        // ============================================================
+        // State
+        // ============================================================
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioBlob = null;
+        let audioContext = null;
+
+        // ============================================================
+        // DOM Elements
+        // ============================================================
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const btnAnalyze = document.getElementById('btnAnalyze');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const analyzeStatus = document.getElementById('analyzeStatus');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const referenceText = document.getElementById('referenceText');
+        const resultsSection = document.getElementById('resultsSection');
+        const langSelect = document.getElementById('langSelect');
+        const langInfo = document.getElementById('langInfo');
+
+        // ============================================================
+        // Language Handling
+        // ============================================================
+        function updateTextDirection() {
+            const lang = langSelect.value;
+            if (lang === 'he') {
+                referenceText.classList.add('rtl');
+            } else {
+                referenceText.classList.remove('rtl');
+            }
+        }
+
+        langSelect.addEventListener('change', updateTextDirection);
+
+        // ============================================================
+        // WAV Encoder (converts raw PCM to WAV format)
+        // ============================================================
+        function encodeWAV(samples, sampleRate) {
+            const buffer = new ArrayBuffer(44 + samples.length * 2);
+            const view = new DataView(buffer);
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + samples.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, samples.length * 2, true);
+            const offset = 44;
+            for (let i = 0; i < samples.length; i++) {
+                const s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(offset + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        // ============================================================
+        // Recording Functions
+        // ============================================================
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+                });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const source = audioContext.createMediaStreamSource(stream);
+                const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                audioChunks = [];
+                processor.onaudioprocess = (e) => {
+                    audioChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+                };
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+                mediaRecorder = { stream, source, processor };
+                btnRecord.disabled = true;
+                btnRecord.classList.add('recording');
+                btnRecord.textContent = 'Recording...';
+                btnStop.disabled = false;
+                btnAnalyze.disabled = true;
+                audioPlayback.classList.add('hidden');
+                showStatus(recordingStatus, 'Recording... Speak now!', 'info');
+            } catch (err) {
+                console.error('Error starting recording:', err);
+                showStatus(recordingStatus, `Error: ${err.message}`, 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (!mediaRecorder) return;
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            mediaRecorder.processor.disconnect();
+            mediaRecorder.source.disconnect();
+            const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const mergedSamples = new Float32Array(totalLength);
+            let offset = 0;
+            for (const chunk of audioChunks) {
+                mergedSamples.set(chunk, offset);
+                offset += chunk.length;
+            }
+            const sampleRate = audioContext ? audioContext.sampleRate : 16000;
+            audioBlob = encodeWAV(mergedSamples, sampleRate);
+            audioPlayback.src = URL.createObjectURL(audioBlob);
+            audioPlayback.classList.remove('hidden');
+            btnRecord.disabled = false;
+            btnRecord.classList.remove('recording');
+            btnRecord.textContent = 'Start Recording';
+            btnStop.disabled = true;
+            btnAnalyze.disabled = false;
+            const durationSec = (mergedSamples.length / sampleRate).toFixed(1);
+            showStatus(recordingStatus, `Recording complete (${durationSec}s). Click "Analyze" to process.`, 'success');
+            if (audioContext) { audioContext.close(); audioContext = null; }
+            mediaRecorder = null;
+        }
+
+        // ============================================================
+        // Analysis Function
+        // ============================================================
+        async function analyzeRecording() {
+            if (!audioBlob) {
+                showStatus(analyzeStatus, 'No recording available. Please record first.', 'error');
+                return;
+            }
+            const text = referenceText.value.trim();
+            if (!text) {
+                showStatus(analyzeStatus, 'Please enter reference text.', 'error');
+                return;
+            }
+            const lang = langSelect.value;
+
+            const formData = new FormData();
+            formData.append('text', text);
+            formData.append('lang', lang);
+            formData.append('audio', audioBlob, 'recording.wav');
+
+            btnAnalyze.disabled = true;
+            btnAnalyze.innerHTML = '<span class="loading"></span>Analyzing...';
+            analyzeStatus.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Analysis failed');
+                displayResults(result);
+                showStatus(analyzeStatus, 'Analysis complete!', 'success');
+            } catch (err) {
+                console.error('Analysis error:', err);
+                showStatus(analyzeStatus, `Error: ${err.message}`, 'error');
+            } finally {
+                btnAnalyze.disabled = false;
+                btnAnalyze.textContent = 'Analyze Reading';
+            }
+        }
+
+        // ============================================================
+        // Display Results
+        // ============================================================
+        const show = (v, fmt = (x) => String(x)) => (v === null || v === undefined) ? '--' : fmt(v);
+
+        function displayResults(report) {
+            console.log('Report received:', report);
+            console.log('Parsed keys:', Object.keys(report));
+
+            const input = report.input || {};
+            const langUsed = input.lang_used || 'en';
+
+            // Update language info display
+            const langNames = { en: 'English', ru: 'Russian', he: 'Hebrew' };
+            langInfo.textContent = `Detected: ${langNames[langUsed] || langUsed}`;
+
+            // Build phrase display with colored tokens (with RTL support)
+            renderPhraseDisplay(report, langUsed);
+
+            // Scores
+            const accuracy = report.accuracy || {};
+            const counts = accuracy.counts || {};
+            const fluency = report.fluency_speed || {};
+            const prosody = report.prosody || {};
+            const pauses = report.punctuation_pauses || {};
+
+            document.getElementById('resultWER').textContent = show(accuracy.wer, (v) => (v * 100).toFixed(1));
+            document.getElementById('resultCorrect').textContent = show(counts.correct);
+            document.getElementById('resultTotal').textContent = `/ ${show(input.text_len_words)}`;
+            document.getElementById('resultWPM').textContent = show(fluency.wpm, (v) => Math.round(v));
+            document.getElementById('resultFluency').textContent = show(fluency.score_0_100, (v) => Math.round(v));
+            document.getElementById('resultProsody').textContent = show(prosody.score_0_100, (v) => Math.round(v));
+            document.getElementById('resultPauses').textContent = show(pauses.summary?.avg_score, (v) => Math.round(v));
+
+            // Punctuation Pauses
+            renderPauseEvents(report);
+
+            // Prosody Punctuation Events
+            renderProsodyEvents(report);
+
+            // Debug info
+            document.getElementById('debugInfo').textContent =
+                `Lang: ${input.lang_requested} -> ${langUsed} | Keys: ${Object.keys(report).join(', ')}`;
+            document.getElementById('rawJSON').textContent = JSON.stringify(report, null, 2);
+
+            resultsSection.classList.remove('hidden');
+        }
+
+        // ============================================================
+        // Render Phrase Display with Colored Tokens
+        // ============================================================
+        function renderPhraseDisplay(report, langUsed = 'en') {
+            const container = document.getElementById('phraseDisplay');
+            container.innerHTML = '';
+
+            // Set RTL for Hebrew
+            if (langUsed === 'he') {
+                container.classList.add('rtl');
+            } else {
+                container.classList.remove('rtl');
+            }
+
+            const refText = report.input?.reference_text || referenceText.value;
+            const alignment = report.accuracy?.alignment || [];
+            const pauseEvents = report.punctuation_pauses?.events || [];
+            const prosodyEvents = report.prosody_punctuation?.events || [];
+
+            // Build maps for quick lookup
+            const pauseMap = {};  // keyed by ref_word
+            pauseEvents.forEach(e => { pauseMap[e.ref_word] = e; });
+            const prosodyMap = {};
+            prosodyEvents.forEach(e => { prosodyMap[e.ref_word] = e; });
+
+            // Parse reference text to get words with punctuation
+            // Unicode-aware pattern: matches letters from any script + punctuation
+            const tokenPattern = /[\p{L}\p{M}]+(?:['''\-][\p{L}\p{M}]+)*|\.{3}|…|[.,;:?!]/gu;
+            const refTokens = refText.match(tokenPattern) || [];
+
+            // Track alignment index
+            let alignIdx = 0;
+
+            refTokens.forEach((token, tokenIdx) => {
+                const isPunct = /^[.,;:?!]$|^\.{3}$|^…$/.test(token);
+
+                if (isPunct) {
+                    // Find pause event for this punctuation
+                    // Look at previous word to find the pause
+                    const prevWordToken = refTokens.slice(0, tokenIdx).filter(t => !/^[.,;:?!]$|^\.{3}$|^…$/.test(t)).pop();
+                    const pauseEvent = prevWordToken ? pauseMap[prevWordToken.toLowerCase()] : null;
+
+                    const span = document.createElement('span');
+                    span.className = 'punct-token';
+                    span.textContent = token;
+
+                    if (pauseEvent) {
+                        if (pauseEvent.classification === 'too_short') {
+                            span.classList.add('pause-short');
+                            span.setAttribute('data-tooltip', `Pause too short: ${pauseEvent.pause_sec?.toFixed(2)}s`);
+                        } else if (pauseEvent.classification === 'too_long') {
+                            span.classList.add('pause-long');
+                            span.setAttribute('data-tooltip', `Pause too long: ${pauseEvent.pause_sec?.toFixed(2)}s`);
+                        } else if (pauseEvent.classification === 'ok') {
+                            span.classList.add('pause-ok');
+                            span.setAttribute('data-tooltip', `Good pause: ${pauseEvent.pause_sec?.toFixed(2)}s`);
+                        }
+                    }
+
+                    container.appendChild(span);
+                } else {
+                    // It's a word - find its alignment
+                    const alignItem = findAlignmentForWord(alignment, token.toLowerCase(), alignIdx);
+
+                    if (alignItem) {
+                        // Check for insertions before this word
+                        while (alignIdx < alignment.length && alignment[alignIdx].tag === 'ins') {
+                            renderInsertionToken(container, alignment[alignIdx]);
+                            alignIdx++;
+                        }
+
+                        const span = document.createElement('span');
+                        span.className = `word-token ${alignItem.tag}`;
+                        span.textContent = token;
+
+                        if (alignItem.tag === 'sub') {
+                            span.setAttribute('data-tooltip', `Said: "${alignItem.hyp}"`);
+                        } else if (alignItem.tag === 'del') {
+                            span.setAttribute('data-tooltip', 'Word omitted');
+                        }
+
+                        // Check for prosody issues on this word (for ? and !)
+                        const prosodyEvent = prosodyMap[token.toLowerCase()];
+                        if (prosodyEvent) {
+                            // Format prosody tooltip with null-safe handling
+                            const formatProsodyTooltip = (event) => {
+                                const classification = event.classification;
+                                const score = event.score_0_100;
+
+                                if (classification === 'unknown') {
+                                    return 'Intonation: not enough data';
+                                }
+
+                                const scoreStr = (score !== null && score !== undefined)
+                                    ? ` (score: ${Math.round(score)})`
+                                    : '';
+                                return `Intonation: ${classification}${scoreStr}`;
+                            };
+
+                            // For questions, flag if not rising
+                            if (prosodyEvent.punct === '?' && prosodyEvent.classification !== 'rising') {
+                                span.classList.add('prosody-issue');
+                                const existing = span.getAttribute('data-tooltip') || '';
+                                span.setAttribute('data-tooltip',
+                                    `${existing}${existing ? ' | ' : ''}${formatProsodyTooltip(prosodyEvent)}`);
+                            }
+                            // For exclamations, flag if not emphatic
+                            if (prosodyEvent.punct === '!' && prosodyEvent.classification === 'neutral') {
+                                span.classList.add('prosody-issue');
+                                const existing = span.getAttribute('data-tooltip') || '';
+                                span.setAttribute('data-tooltip',
+                                    `${existing}${existing ? ' | ' : ''}Not emphatic enough`);
+                            }
+                        }
+
+                        container.appendChild(span);
+                        alignIdx++;
+                    } else {
+                        // Word not found in alignment, show as-is
+                        const span = document.createElement('span');
+                        span.className = 'word-token';
+                        span.textContent = token;
+                        container.appendChild(span);
+                    }
+                }
+
+                // Add space after token (except punctuation that attaches to previous)
+                if (!isPunct || token === '...' || token === '…') {
+                    container.appendChild(document.createTextNode(' '));
+                }
+            });
+
+            // Handle any remaining insertions at the end
+            while (alignIdx < alignment.length) {
+                if (alignment[alignIdx].tag === 'ins') {
+                    renderInsertionToken(container, alignment[alignIdx]);
+                }
+                alignIdx++;
+            }
+        }
+
+        function findAlignmentForWord(alignment, word, startIdx) {
+            // Find alignment item for a reference word starting from startIdx
+            for (let i = startIdx; i < alignment.length; i++) {
+                const item = alignment[i];
+                if (item.tag === 'ins') continue;  // Skip insertions
+                if (item.ref && item.ref.toLowerCase() === word) {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        function renderInsertionToken(container, alignItem) {
+            const span = document.createElement('span');
+            span.className = 'word-token ins';
+            span.textContent = `+${alignItem.hyp}`;
+            span.setAttribute('data-tooltip', 'Extra word spoken');
+            container.appendChild(span);
+            container.appendChild(document.createTextNode(' '));
+        }
+
+        // ============================================================
+        // Render Pause Events
+        // ============================================================
+        function renderPauseEvents(report) {
+            const section = document.getElementById('pausesSection');
+            const container = document.getElementById('pauseEvents');
+            container.innerHTML = '';
+
+            const events = report.punctuation_pauses?.events || [];
+            if (events.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+
+            events.forEach(event => {
+                const div = document.createElement('div');
+                div.className = `event-item ${event.classification}`;
+
+                // Null-safe formatting
+                const pauseStr = (event.pause_sec !== null && event.pause_sec !== undefined)
+                    ? `${event.pause_sec.toFixed(2)}s`
+                    : '—';
+                const expectedStr = event.expected
+                    ? `${event.expected.min}–${event.expected.max}s`
+                    : '—';
+                const scoreStr = (event.score_0_100 !== null && event.score_0_100 !== undefined)
+                    ? event.score_0_100.toFixed(0)
+                    : '—';
+                const classificationDisplay = event.classification === 'missing'
+                    ? 'word not spoken'
+                    : event.classification;
+
+                div.innerHTML = `
+                    <strong>"${event.ref_word}"${event.punct}</strong> |
+                    Pause: <strong>${pauseStr}</strong> (expected: ${expectedStr}) |
+                    <strong>${classificationDisplay}</strong> |
+                    Score: ${scoreStr}/100
+                    ${event.notes?.length ? `<br><small style="color:#666">${event.notes.join('; ')}</small>` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================================
+        // Render Prosody Events
+        // ============================================================
+        function renderProsodyEvents(report) {
+            const section = document.getElementById('punctuationSection');
+            const container = document.getElementById('punctuationEvents');
+            container.innerHTML = '';
+
+            const events = report.prosody_punctuation?.events || [];
+            if (events.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+
+            events.forEach(event => {
+                const div = document.createElement('div');
+                div.className = `event-item ${event.classification}`;
+
+                const punct = event.punct === '?' ? 'Question' : 'Exclamation';
+
+                // Handle unknown classification and null scores gracefully
+                let classificationDisplay = event.classification;
+                let scoreDisplay;
+
+                if (event.classification === 'unknown') {
+                    classificationDisplay = 'insufficient data';
+                    scoreDisplay = '—';
+                } else if (event.score_0_100 === null || event.score_0_100 === undefined) {
+                    scoreDisplay = '—';
+                } else {
+                    scoreDisplay = event.score_0_100.toFixed(1);
+                }
+
+                div.innerHTML = `
+                    <strong>${punct}</strong> after "${event.ref_word}" |
+                    Classification: <strong>${classificationDisplay}</strong> |
+                    Score: <strong>${scoreDisplay}</strong>/100
+                    ${event.notes?.length ? `<br><small style="color:#666">${event.notes.join('; ')}</small>` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================================
+        // Utility Functions
+        // ============================================================
+        function showStatus(element, message, type) {
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.classList.remove('hidden');
+        }
+
+        // ============================================================
+        // Event Listeners
+        // ============================================================
+        btnRecord.addEventListener('click', startRecording);
+        btnStop.addEventListener('click', stopRecording);
+        btnAnalyze.addEventListener('click', analyzeRecording);
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showStatus(recordingStatus, 'Your browser does not support audio recording.', 'error');
+            btnRecord.disabled = true;
+        }
+    </script>
+</body>
+</html>

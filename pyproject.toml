@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "readscore"
+version = "0.1.0"
+description = "Evaluate spoken audio reading against reference text with 4 independent metrics"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "ReadScore Authors"}
+]
+keywords = ["speech", "audio", "evaluation", "asr", "reading", "fluency", "prosody"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "numpy>=1.20.0",
+]
+
+[project.optional-dependencies]
+whisper = [
+    "faster-whisper>=0.9.0",
+]
+whisper-openai = [
+    "openai-whisper>=20230918",
+]
+audio = [
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    "pydub>=0.25.0",
+]
+server = [
+    "flask>=2.0.0",
+    "flask-cors>=4.0.0",
+]
+full = [
+    "faster-whisper>=0.9.0",
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    "pydub>=0.25.0",
+    "flask>=2.0.0",
+    "flask-cors>=4.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+readscore = "readscore.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/example/readscore"
+Documentation = "https://github.com/example/readscore#readme"
+Repository = "https://github.com/example/readscore"
+
+[tool.setuptools.packages.find]
+include = ["readscore*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["readscore"]
+omit = ["tests/*"]

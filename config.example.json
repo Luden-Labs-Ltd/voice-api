@@ -1,0 +1,18 @@
+{
+  "whisper_model": "base",
+  "whisper_device": "cpu",
+  "language": "en",
+  "fluency": {
+    "wpm_min": 110,
+    "wpm_max": 170,
+    "pause_thresholds_ms": [250, 500, 1000, 2000]
+  },
+  "punctuation": {
+    "window_sec": 0.45,
+    "question_pitch_delta_hz": 8.0,
+    "question_pitch_slope_hz_per_s": 15.0,
+    "exclaim_energy_ratio": 1.25,
+    "exclaim_pitch_std_hz": 15.0,
+    "exclaim_pitch_range_hz": 25.0
+  }
+}

@@ -1,0 +1,33 @@
+services:
+
+  python-service:
+    build:
+      # Root is the build context so the Dockerfile can reach readscore/ and pyproject.toml.
+      context: .
+      dockerfile: python-service/Dockerfile
+    # Not exposed on the host — only reachable by node-api inside the compose network.
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Whisper model download on first start can be slow.
+      start_period: 120s
+
+  node-api:
+    build:
+      context: .
+      dockerfile: node-api/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PYTHON_SERVICE_URL=http://python-service:8000
+    depends_on:
+      python-service:
+        condition: service_healthy
