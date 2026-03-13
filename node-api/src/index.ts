@@ -6,6 +6,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 
 // Railway injects PORT; NODE_PORT is the local-dev fallback from .env.
@@ -25,6 +26,8 @@ const FRONTEND_DIR =
 const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 
 const fastify = Fastify({ logger: { level: LOG_LEVEL } });
+
+fastify.register(cors, { origin: true });
 
 fastify.register(multipart, {
   limits: {
