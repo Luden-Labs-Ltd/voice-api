@@ -55,12 +55,39 @@
         .btn-stop:hover:not(:disabled) { background: #7f8c8d; }
         .btn-analyze { background: #3498db; color: white; }
         .btn-analyze:hover:not(:disabled) { background: #2980b9; }
+        .btn-upload {
+            display: inline-block;
+            padding: 8px 16px;
+            font-size: 14px;
+            background: #6c757d;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-upload:hover { background: #5a6268; }
+        .btn-clear-file {
+            padding: 6px 10px;
+            font-size: 13px;
+            background: none;
+            color: #888;
+            border: 1px solid #ccc;
+            margin: 0;
+        }
+        .btn-clear-file:hover { background: #f0f0f0; color: #333; }
+        .upload-divider {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
         .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
         .status.info { background: #d1ecf1; color: #0c5460; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.success { background: #d4edda; color: #155724; }
+        .status.warning { background: #fff3cd; color: #856404; }
 
         .results-grid {
             display: grid;
@@ -100,23 +127,35 @@
             position: relative;
             cursor: default;
         }
-        /* Correct word (ok) */
-        .word-token.ok { background: #d4edda; color: #155724; }
-        /* Substitution (wrong word) */
-        .word-token.sub { background: #f8d7da; color: #721c24; }
-        /* Deletion (omitted) */
-        .word-token.del {
+        /* Correct word — green */
+        .word-token.correct { background: #d4edda; color: #155724; }
+        /* Near match — slightly different form but acceptable; light green */
+        .word-token.near_match { background: #b8e6b8; color: #1a5c1a; }
+        /* Uncertain ASR — ASR wasn't confident; soft yellow */
+        .word-token.uncertain_asr { background: #fff3cd; color: #7a5c00; }
+        /* Wrong word — high-confidence mismatch; red */
+        .word-token.wrong_word { background: #f8d7da; color: #721c24; }
+        /* Omitted — word skipped; gray strikethrough */
+        .word-token.omitted {
             background: #e9ecef;
             color: #6c757d;
             text-decoration: line-through;
         }
-        /* Insertion (extra word) */
-        .word-token.ins {
+        /* Extra — word not in reference; orange dashed */
+        .word-token.extra {
             background: #fff3cd;
             color: #856404;
             font-size: 14px;
             padding: 1px 5px;
             border: 1px dashed #ffc107;
+        }
+        /* ASR noise — bogus ASR hallucination; dimmed */
+        .word-token.asr_noise {
+            background: #f0f0f0;
+            color: #aaa;
+            font-size: 12px;
+            padding: 1px 4px;
+            border: 1px dotted #ccc;
         }
         /* Punctuation */
         .punct-token {
@@ -125,17 +164,10 @@
             margin: 0 2px;
             position: relative;
         }
-        /* Pause issues on punctuation */
-        .punct-token.pause-short {
-            border-bottom: 3px solid #f1c40f;
-        }
-        .punct-token.pause-long {
-            border-bottom: 3px solid #9b59b6;
-        }
-        .punct-token.pause-ok {
-            border-bottom: 2px solid #27ae60;
-        }
-        /* Prosody issues (wavy underline for ? and !) */
+        .punct-token.pause-short { border-bottom: 3px solid #f1c40f; }
+        .punct-token.pause-long  { border-bottom: 3px solid #9b59b6; }
+        .punct-token.pause-ok    { border-bottom: 2px solid #27ae60; }
+        /* Prosody issues */
         .word-token.prosody-issue {
             text-decoration: underline wavy #3498db;
             text-underline-offset: 4px;
@@ -168,28 +200,23 @@
             margin-top: 15px;
             font-size: 13px;
         }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
         .legend-box {
-            width: 20px;
-            height: 20px;
+            width: 20px; height: 20px;
             border-radius: 3px;
             display: inline-block;
         }
-        .legend-box.ok { background: #d4edda; }
-        .legend-box.sub { background: #f8d7da; }
-        .legend-box.del { background: #e9ecef; text-decoration: line-through; }
-        .legend-box.ins { background: #fff3cd; border: 1px dashed #ffc107; }
+        .legend-box.ok            { background: #d4edda; }
+        .legend-box.near_match    { background: #b8e6b8; }
+        .legend-box.uncertain_asr { background: #fff3cd; }
+        .legend-box.wrong_word    { background: #f8d7da; }
+        .legend-box.omitted       { background: #e9ecef; text-decoration: line-through; }
+        .legend-box.extra         { background: #fff3cd; border: 1px dashed #ffc107; }
+        .legend-box.asr_noise     { background: #f0f0f0; border: 1px dotted #ccc; }
         .legend-line { height: 3px; width: 20px; display: inline-block; }
         .legend-line.pause-short { background: #f1c40f; }
-        .legend-line.pause-long { background: #9b59b6; }
-        .legend-line.prosody {
-            background: transparent;
-            border-bottom: 2px wavy #3498db;
-        }
+        .legend-line.pause-long  { background: #9b59b6; }
+        .legend-line.prosody     { background: transparent; border-bottom: 2px wavy #3498db; }
 
         /* Event items */
         .event-item {
@@ -199,12 +226,12 @@
             border-radius: 4px;
             border-left: 4px solid #9b59b6;
         }
-        .event-item.rising { border-color: #27ae60; }
-        .event-item.falling { border-color: #e74c3c; }
-        .event-item.flat { border-color: #f39c12; }
-        .event-item.ok { border-color: #27ae60; }
+        .event-item.rising    { border-color: #27ae60; }
+        .event-item.falling   { border-color: #e74c3c; }
+        .event-item.flat      { border-color: #f39c12; }
+        .event-item.ok        { border-color: #27ae60; }
         .event-item.too_short { border-color: #f1c40f; }
-        .event-item.too_long { border-color: #9b59b6; }
+        .event-item.too_long  { border-color: #9b59b6; }
 
         pre {
             background: #2c3e50;
@@ -229,12 +256,7 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Language selector */
-        .lang-selector {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
+        .lang-selector { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .lang-selector label { font-weight: 500; }
         .lang-selector select {
             padding: 8px 12px;
@@ -243,11 +265,7 @@
             border-radius: 4px;
             background: white;
         }
-        .lang-info {
-            font-size: 12px;
-            color: #666;
-            margin-left: 10px;
-        }
+        .lang-info { font-size: 12px; color: #666; margin-left: 10px; }
 
         /* RTL support for Hebrew */
         .phrase-display.rtl {
@@ -256,13 +274,8 @@
             text-align: right;
         }
         .phrase-display.rtl .word-token,
-        .phrase-display.rtl .punct-token {
-            direction: rtl;
-        }
-        textarea.rtl {
-            direction: rtl;
-            text-align: right;
-        }
+        .phrase-display.rtl .punct-token { direction: rtl; }
+        textarea.rtl { direction: rtl; text-align: right; }
     </style>
 </head>
 <body>
@@ -277,21 +290,32 @@
             <select id="langSelect">
                 <option value="en">English</option>
                 <option value="ru">Русский (Russian)</option>
-                <option value="he">עברית (Hebrew)</option>
+                <option value="he" selected>עברית (Hebrew)</option>
                 <option value="auto">Auto-detect</option>
             </select>
             <span class="lang-info" id="langInfo"></span>
         </div>
-        <textarea id="referenceText" placeholder="Enter the text you will read aloud...">Hello. How are you?</textarea>
+        <textarea id="referenceText" placeholder="Enter the text you will read aloud...">שלום. מה שלומך?</textarea>
     </div>
 
     <div class="section">
-        <h2>2. Record Your Reading</h2>
-        <p>Click "Start Recording", read the text aloud, then click "Stop Recording".</p>
+        <h2>2. Audio Input</h2>
+        <p>Record from microphone, or upload an audio file for testing.</p>
         <button id="btnRecord" class="btn-record">Start Recording</button>
         <button id="btnStop" class="btn-stop" disabled>Stop Recording</button>
         <div id="recordingStatus" class="status info hidden"></div>
         <audio id="audioPlayback" controls class="hidden" style="width: 100%; margin-top: 10px;"></audio>
+
+        <div class="upload-divider">
+            <span style="font-size: 13px; color: #666;">For testing, you can upload an audio file instead of recording:</span>
+            <div class="upload-row">
+                <label for="audioFileInput" class="btn-upload">Choose File</label>
+                <input type="file" id="audioFileInput" accept=".ogg,.wav,.mp3,.m4a" style="display:none">
+                <span id="uploadedFileName" style="font-size: 13px; color: #666;">No file chosen</span>
+                <button id="btnClearFile" class="btn-clear-file hidden">✕ Clear</button>
+            </div>
+            <div style="font-size: 11px; color: #999; margin-top: 4px;">Accepted: .ogg, .wav, .mp3, .m4a</div>
+        </div>
     </div>
 
     <div class="section">
@@ -304,6 +328,9 @@
     <div id="resultsSection" class="section hidden">
         <h2>Results</h2>
 
+        <!-- ASR Reliability Warning (shown when Hebrew ASR is unstable/mixed) -->
+        <div id="asrReliability" class="status hidden"></div>
+
         <!-- Phrase Display with Colored Tokens -->
         <h3>Your Reading</h3>
         <div id="phraseDisplay" class="phrase-display"></div>
@@ -311,9 +338,12 @@
         <!-- Legend -->
         <div class="legend">
             <div class="legend-item"><span class="legend-box ok"></span> Correct</div>
-            <div class="legend-item"><span class="legend-box sub"></span> Wrong word</div>
-            <div class="legend-item"><span class="legend-box del">ab</span> Omitted</div>
-            <div class="legend-item"><span class="legend-box ins"></span> Extra word</div>
+            <div class="legend-item"><span class="legend-box near_match"></span> Near match</div>
+            <div class="legend-item"><span class="legend-box uncertain_asr"></span> Uncertain (ASR)</div>
+            <div class="legend-item"><span class="legend-box wrong_word"></span> Wrong word</div>
+            <div class="legend-item"><span class="legend-box omitted">ab</span> Omitted</div>
+            <div class="legend-item"><span class="legend-box extra"></span> Extra word</div>
+            <div class="legend-item"><span class="legend-box asr_noise"></span> ASR noise</div>
             <div class="legend-item"><span class="legend-line pause-short"></span> Pause too short</div>
             <div class="legend-item"><span class="legend-line pause-long"></span> Pause too long</div>
             <div class="legend-item"><span class="legend-line prosody"></span> Intonation issue</div>
@@ -328,7 +358,7 @@
                 <span class="unit">%</span>
             </div>
             <div class="result-card">
-                <h4>Correct Words</h4>
+                <h4>Words Read Well</h4>
                 <span id="resultCorrect" class="value">--</span>
                 <span class="unit" id="resultTotal">/ --</span>
             </div>
@@ -366,9 +396,20 @@
             <div id="punctuationEvents"></div>
         </div>
 
+        <!-- ASR Diagnostics -->
+        <details id="asrDiagnosticsDetails">
+            <summary style="cursor: pointer; color: #666; font-size: 15px; font-weight: 600;">ASR Diagnostics</summary>
+            <div id="asrDiagnosticsContent" style="margin-top: 10px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-family: monospace; font-size: 13px;">
+                <div><strong>Reference:</strong> <span id="diagRef" style="direction: rtl; unicode-bidi: plaintext;"></span></div>
+                <div style="margin-top: 6px;"><strong>Recognized:</strong> <span id="diagTranscript" style="direction: rtl; unicode-bidi: plaintext;"></span></div>
+                <div style="margin-top: 6px;"><strong>Avg Confidence:</strong> <span id="diagConfidence"></span></div>
+                <div style="margin-top: 4px;"><strong>ASR Status:</strong> <span id="diagStatus"></span></div>
+                <div style="margin-top: 4px;"><strong>Ref words:</strong> <span id="diagWordCount"></span></div>
+            </div>
+        </details>
+
         <!-- Debug Info -->
-        <h3>Debug</h3>
-        <p id="debugInfo" style="font-family: monospace; font-size: 11px; color: #666;"></p>
+        <p id="debugInfo" style="font-family: monospace; font-size: 11px; color: #666; margin-top: 10px;"></p>
 
         <!-- Raw JSON -->
         <details>
@@ -385,6 +426,7 @@
         let audioChunks = [];
         let audioBlob = null;
         let audioContext = null;
+        let uploadedFile = null;
 
         // ============================================================
         // DOM Elements
@@ -399,6 +441,26 @@
         const resultsSection = document.getElementById('resultsSection');
         const langSelect = document.getElementById('langSelect');
         const langInfo = document.getElementById('langInfo');
+        const audioFileInput = document.getElementById('audioFileInput');
+        const uploadedFileName = document.getElementById('uploadedFileName');
+        const btnClearFile = document.getElementById('btnClearFile');
+
+        // ============================================================
+        // Hebrew normalization (mirrors normalize.py exactly)
+        // Must match Python's normalize_word(word, lang='he') pipeline:
+        //   1. Strip niqqud / cantillation marks (U+0591–U+05C7)
+        //   2. Strip geresh (U+05F3) and gershayim (U+05F4)
+        //   3. Normalize final letter forms (ך→כ etc.)
+        // ============================================================
+        const HEBREW_FINALS = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
+        const HEBREW_NIQQUD_RE = /[\u0591-\u05C7\u05F3\u05F4]/g;
+
+        function normalizeHebrewWord(w) {
+            // Step 1: strip niqqud, cantillation, geresh, gershayim
+            w = w.replace(HEBREW_NIQQUD_RE, '');
+            // Step 2: normalize final letter forms to base forms
+            return w.split('').map(c => HEBREW_FINALS[c] || c).join('');
+        }
 
         // ============================================================
         // Language Handling
@@ -413,9 +475,11 @@
         }
 
         langSelect.addEventListener('change', updateTextDirection);
+        // Apply RTL immediately for the default Hebrew selection
+        updateTextDirection();
 
         // ============================================================
-        // WAV Encoder (converts raw PCM to WAV format)
+        // WAV Encoder
         // ============================================================
         function encodeWAV(samples, sampleRate) {
             const buffer = new ArrayBuffer(44 + samples.length * 2);
@@ -448,7 +512,7 @@
         }
 
         // ============================================================
-        // Recording Functions
+        // Recording
         // ============================================================
         async function startRecording() {
             try {
@@ -506,11 +570,53 @@
         }
 
         // ============================================================
-        // Analysis Function
+        // File Upload
+        // ============================================================
+        const ALLOWED_EXTS = ['.ogg', '.wav', '.mp3', '.m4a'];
+
+        audioFileInput.addEventListener('change', () => {
+            const file = audioFileInput.files[0];
+            if (!file) return;
+
+            const name = file.name.toLowerCase();
+            if (!ALLOWED_EXTS.some(e => name.endsWith(e))) {
+                showStatus(analyzeStatus,
+                    'Unsupported file type. Please upload .ogg, .wav, .mp3, or .m4a.', 'error');
+                audioFileInput.value = '';
+                return;
+            }
+
+            uploadedFile = file;
+            uploadedFileName.textContent = file.name;
+            btnClearFile.classList.remove('hidden');
+            btnAnalyze.disabled = false;
+            audioPlayback.src = URL.createObjectURL(file);
+            audioPlayback.classList.remove('hidden');
+            showStatus(recordingStatus, `File loaded: ${file.name}`, 'success');
+        });
+
+        btnClearFile.addEventListener('click', () => {
+            uploadedFile = null;
+            audioFileInput.value = '';
+            uploadedFileName.textContent = 'No file chosen';
+            btnClearFile.classList.add('hidden');
+            if (audioBlob) {
+                audioPlayback.src = URL.createObjectURL(audioBlob);
+            } else {
+                audioPlayback.classList.add('hidden');
+                audioPlayback.src = '';
+                btnAnalyze.disabled = true;
+            }
+            recordingStatus.classList.add('hidden');
+        });
+
+        // ============================================================
+        // Analysis
         // ============================================================
         async function analyzeRecording() {
-            if (!audioBlob) {
-                showStatus(analyzeStatus, 'No recording available. Please record first.', 'error');
+            const audioSource = uploadedFile || audioBlob;
+            if (!audioSource) {
+                showStatus(analyzeStatus, 'Please record audio or upload an audio file first.', 'error');
                 return;
             }
             const text = referenceText.value.trim();
@@ -523,7 +629,11 @@
             const formData = new FormData();
             formData.append('text', text);
             formData.append('lang', lang);
-            formData.append('audio', audioBlob, 'recording.wav');
+            if (uploadedFile) {
+                formData.append('audio', uploadedFile);
+            } else {
+                formData.append('audio', audioBlob, 'recording.wav');
+            }
 
             btnAnalyze.disabled = true;
             btnAnalyze.innerHTML = '<span class="loading"></span>Analyzing...';
@@ -552,19 +662,17 @@
 
         function displayResults(report) {
             console.log('Report received:', report);
-            console.log('Parsed keys:', Object.keys(report));
 
             const input = report.input || {};
             const langUsed = input.lang_used || 'en';
 
-            // Update language info display
             const langNames = { en: 'English', ru: 'Russian', he: 'Hebrew' };
             langInfo.textContent = `Detected: ${langNames[langUsed] || langUsed}`;
 
-            // Build phrase display with colored tokens (with RTL support)
             renderPhraseDisplay(report, langUsed);
+            renderAsrReliability(report, langUsed);
+            renderAsrDiagnostics(report, langUsed);
 
-            // Scores
             const accuracy = report.accuracy || {};
             const counts = accuracy.counts || {};
             const fluency = report.fluency_speed || {};
@@ -572,20 +680,17 @@
             const pauses = report.punctuation_pauses || {};
 
             document.getElementById('resultWER').textContent = show(accuracy.wer, (v) => (v * 100).toFixed(1));
-            document.getElementById('resultCorrect').textContent = show(counts.correct);
+            const wellRead = (counts.correct || 0) + (counts.near_match || 0);
+            document.getElementById('resultCorrect').textContent = wellRead || '--';
             document.getElementById('resultTotal').textContent = `/ ${show(input.text_len_words)}`;
             document.getElementById('resultWPM').textContent = show(fluency.wpm, (v) => Math.round(v));
             document.getElementById('resultFluency').textContent = show(fluency.score_0_100, (v) => Math.round(v));
             document.getElementById('resultProsody').textContent = show(prosody.score_0_100, (v) => Math.round(v));
             document.getElementById('resultPauses').textContent = show(pauses.summary?.avg_score, (v) => Math.round(v));
 
-            // Punctuation Pauses
             renderPauseEvents(report);
-
-            // Prosody Punctuation Events
             renderProsodyEvents(report);
 
-            // Debug info
             document.getElementById('debugInfo').textContent =
                 `Lang: ${input.lang_requested} -> ${langUsed} | Keys: ${Object.keys(report).join(', ')}`;
             document.getElementById('rawJSON').textContent = JSON.stringify(report, null, 2);
@@ -594,13 +699,75 @@
         }
 
         // ============================================================
-        // Render Phrase Display with Colored Tokens
+        // ASR Reliability Banner
+        // ============================================================
+        function renderAsrReliability(report, langUsed) {
+            const banner = document.getElementById('asrReliability');
+            const reliability = report.pronunciation_quality?.asr_reliability;
+
+            if (!reliability || reliability.status === 'stable' || reliability.status === 'unknown') {
+                banner.classList.add('hidden');
+                return;
+            }
+
+            const avgConf = reliability.avg_confidence !== null
+                ? ` (avg confidence: ${(reliability.avg_confidence * 100).toFixed(0)}%)`
+                : '';
+
+            if (reliability.status === 'unstable') {
+                banner.className = 'status warning';
+                banner.textContent = langUsed === 'he'
+                    ? `⚠ זיהוי הדיבור היה לא יציב${avgConf}. חלק מהטעויות עשויות לשקף אי-ודאות בזיהוי, לא שגיאות קריאה. הציון הותאם.`
+                    : `⚠ ASR recognition was unstable${avgConf}. Some apparent errors may reflect recognition uncertainty, not reading mistakes. Score adjusted.`;
+            } else {
+                banner.className = 'status info';
+                banner.textContent = langUsed === 'he'
+                    ? `ℹ אמינות הזיהוי: מעורבת${avgConf}. מילים לא בטוחות טופלו בסבלנות.`
+                    : `ℹ ASR reliability: mixed${avgConf}. Uncertain words treated leniently.`;
+            }
+
+            banner.classList.remove('hidden');
+        }
+
+        // ============================================================
+        // ASR Diagnostics Panel
+        // ============================================================
+        function renderAsrDiagnostics(report, langUsed) {
+            const diag = report.asr_diagnostics;
+            if (!diag) return;
+
+            const reliability = report.pronunciation_quality?.asr_reliability;
+
+            document.getElementById('diagRef').textContent = report.input?.reference_text || '';
+            document.getElementById('diagTranscript').textContent = diag.raw_transcript || '(none)';
+
+            const conf = diag.avg_confidence;
+            document.getElementById('diagConfidence').textContent =
+                conf != null ? `${(conf * 100).toFixed(0)}%` : '—';
+
+            const status = reliability?.status || '—';
+            const statusEl = document.getElementById('diagStatus');
+            statusEl.textContent = status;
+            statusEl.style.color = status === 'stable' ? '#155724' :
+                                   status === 'mixed'  ? '#856404' :
+                                   status === 'unstable' ? '#721c24' : '#666';
+
+            document.getElementById('diagWordCount').textContent =
+                `${diag.word_count_ref} ref / ${diag.word_count_asr} recognized`;
+
+            // Auto-open diagnostics for Hebrew when ASR is not stable
+            if (langUsed === 'he' && status !== 'stable' && status !== '—') {
+                document.getElementById('asrDiagnosticsDetails').open = true;
+            }
+        }
+
+        // ============================================================
+        // Render Phrase Display
         // ============================================================
         function renderPhraseDisplay(report, langUsed = 'en') {
             const container = document.getElementById('phraseDisplay');
             container.innerHTML = '';
 
-            // Set RTL for Hebrew
             if (langUsed === 'he') {
                 container.classList.add('rtl');
             } else {
@@ -612,28 +779,29 @@
             const pauseEvents = report.punctuation_pauses?.events || [];
             const prosodyEvents = report.prosody_punctuation?.events || [];
 
-            // Build maps for quick lookup
-            const pauseMap = {};  // keyed by ref_word
+            // Maps are keyed by Python-normalized ref_word.
+            // For Hebrew we must normalize the JS lookup key the same way.
+            const normalizeKey = (langUsed === 'he')
+                ? w => normalizeHebrewWord(w.toLowerCase())
+                : w => w.toLowerCase();
+
+            const pauseMap = {};
             pauseEvents.forEach(e => { pauseMap[e.ref_word] = e; });
             const prosodyMap = {};
             prosodyEvents.forEach(e => { prosodyMap[e.ref_word] = e; });
 
-            // Parse reference text to get words with punctuation
-            // Unicode-aware pattern: matches letters from any script + punctuation
             const tokenPattern = /[\p{L}\p{M}]+(?:['''\-][\p{L}\p{M}]+)*|\.{3}|…|[.,;:?!]/gu;
             const refTokens = refText.match(tokenPattern) || [];
 
-            // Track alignment index
             let alignIdx = 0;
 
             refTokens.forEach((token, tokenIdx) => {
                 const isPunct = /^[.,;:?!]$|^\.{3}$|^…$/.test(token);
 
                 if (isPunct) {
-                    // Find pause event for this punctuation
-                    // Look at previous word to find the pause
-                    const prevWordToken = refTokens.slice(0, tokenIdx).filter(t => !/^[.,;:?!]$|^\.{3}$|^…$/.test(t)).pop();
-                    const pauseEvent = prevWordToken ? pauseMap[prevWordToken.toLowerCase()] : null;
+                    const prevWordToken = refTokens.slice(0, tokenIdx)
+                        .filter(t => !/^[.,;:?!]$|^\.{3}$|^…$/.test(t)).pop();
+                    const pauseEvent = prevWordToken ? pauseMap[normalizeKey(prevWordToken)] : null;
 
                     const span = document.createElement('span');
                     span.className = 'punct-token';
@@ -654,52 +822,59 @@
 
                     container.appendChild(span);
                 } else {
-                    // It's a word - find its alignment
-                    const alignItem = findAlignmentForWord(alignment, token.toLowerCase(), alignIdx);
+                    const found = findAlignmentForWord(alignment, token.toLowerCase(), alignIdx, langUsed);
 
-                    if (alignItem) {
-                        // Check for insertions before this word
-                        while (alignIdx < alignment.length && alignment[alignIdx].tag === 'ins') {
-                            renderInsertionToken(container, alignment[alignIdx]);
-                            alignIdx++;
+                    // Debug logging for Hebrew (helps diagnose normalization mismatches)
+                    if (langUsed === 'he') {
+                        console.log(
+                            `[He] token="${token}"`,
+                            `norm="${normalizeHebrewWord(token.toLowerCase())}"`,
+                            found
+                                ? `→ tag="${found.item.tag}" ref="${found.item.ref}" idx=${found.index}`
+                                : '→ NOT FOUND (plain text fallback)'
+                        );
+                    }
+
+                    if (found) {
+                        const { item: alignItem, index: foundIdx } = found;
+
+                        // Render any insertions that appear before the found item
+                        while (alignIdx <= foundIdx) {
+                            if (INSERTION_TAGS.has(alignment[alignIdx].tag)) {
+                                renderInsertionToken(container, alignment[alignIdx]);
+                            }
+                            if (alignIdx < foundIdx) alignIdx++;
+                            else break;
                         }
 
                         const span = document.createElement('span');
                         span.className = `word-token ${alignItem.tag}`;
                         span.textContent = token;
 
-                        if (alignItem.tag === 'sub') {
+                        if (alignItem.tag === 'wrong_word') {
                             span.setAttribute('data-tooltip', `Said: "${alignItem.hyp}"`);
-                        } else if (alignItem.tag === 'del') {
+                        } else if (alignItem.tag === 'near_match') {
+                            span.setAttribute('data-tooltip', `Near match: "${alignItem.hyp}"`);
+                        } else if (alignItem.tag === 'uncertain_asr') {
+                            span.setAttribute('data-tooltip', `ASR uncertain: "${alignItem.hyp || '?'}"`);
+                        } else if (alignItem.tag === 'omitted') {
                             span.setAttribute('data-tooltip', 'Word omitted');
                         }
 
-                        // Check for prosody issues on this word (for ? and !)
-                        const prosodyEvent = prosodyMap[token.toLowerCase()];
+                        const prosodyEvent = prosodyMap[normalizeKey(token)];
                         if (prosodyEvent) {
-                            // Format prosody tooltip with null-safe handling
                             const formatProsodyTooltip = (event) => {
-                                const classification = event.classification;
-                                const score = event.score_0_100;
-
-                                if (classification === 'unknown') {
-                                    return 'Intonation: not enough data';
-                                }
-
-                                const scoreStr = (score !== null && score !== undefined)
-                                    ? ` (score: ${Math.round(score)})`
-                                    : '';
-                                return `Intonation: ${classification}${scoreStr}`;
+                                if (event.classification === 'unknown') return 'Intonation: not enough data';
+                                const scoreStr = (event.score_0_100 !== null && event.score_0_100 !== undefined)
+                                    ? ` (score: ${Math.round(event.score_0_100)})` : '';
+                                return `Intonation: ${event.classification}${scoreStr}`;
                             };
-
-                            // For questions, flag if not rising
                             if (prosodyEvent.punct === '?' && prosodyEvent.classification !== 'rising') {
                                 span.classList.add('prosody-issue');
                                 const existing = span.getAttribute('data-tooltip') || '';
                                 span.setAttribute('data-tooltip',
                                     `${existing}${existing ? ' | ' : ''}${formatProsodyTooltip(prosodyEvent)}`);
                             }
-                            // For exclamations, flag if not emphatic
                             if (prosodyEvent.punct === '!' && prosodyEvent.classification === 'neutral') {
                                 span.classList.add('prosody-issue');
                                 const existing = span.getAttribute('data-tooltip') || '';
@@ -709,9 +884,8 @@
                         }
 
                         container.appendChild(span);
-                        alignIdx++;
+                        alignIdx = foundIdx + 1;  // advance past the found item
                     } else {
-                        // Word not found in alignment, show as-is
                         const span = document.createElement('span');
                         span.className = 'word-token';
                         span.textContent = token;
@@ -719,28 +893,35 @@
                     }
                 }
 
-                // Add space after token (except punctuation that attaches to previous)
                 if (!isPunct || token === '...' || token === '…') {
                     container.appendChild(document.createTextNode(' '));
                 }
             });
 
-            // Handle any remaining insertions at the end
             while (alignIdx < alignment.length) {
-                if (alignment[alignIdx].tag === 'ins') {
+                if (INSERTION_TAGS.has(alignment[alignIdx].tag)) {
                     renderInsertionToken(container, alignment[alignIdx]);
                 }
                 alignIdx++;
             }
         }
 
-        function findAlignmentForWord(alignment, word, startIdx) {
-            // Find alignment item for a reference word starting from startIdx
+        // Tags that represent inserted words (no reference word)
+        const INSERTION_TAGS = new Set(['extra', 'asr_noise']);
+
+        // Returns { item, index } so the caller can advance alignIdx to index+1.
+        function findAlignmentForWord(alignment, word, startIdx, lang) {
+            const normalize = (lang === 'he')
+                ? w => normalizeHebrewWord(w)
+                : w => w;
+
+            const normalizedWord = normalize(word);
+
             for (let i = startIdx; i < alignment.length; i++) {
                 const item = alignment[i];
-                if (item.tag === 'ins') continue;  // Skip insertions
-                if (item.ref && item.ref.toLowerCase() === word) {
-                    return item;
+                if (INSERTION_TAGS.has(item.tag)) continue;
+                if (item.ref && normalize(item.ref.toLowerCase()) === normalizedWord) {
+                    return { item, index: i };
                 }
             }
             return null;
@@ -748,9 +929,15 @@
 
         function renderInsertionToken(container, alignItem) {
             const span = document.createElement('span');
-            span.className = 'word-token ins';
-            span.textContent = `+${alignItem.hyp}`;
-            span.setAttribute('data-tooltip', 'Extra word spoken');
+            if (alignItem.tag === 'asr_noise') {
+                span.className = 'word-token asr_noise';
+                span.textContent = alignItem.hyp || '';
+                span.setAttribute('data-tooltip', 'ASR noise (not a reading error)');
+            } else {
+                span.className = 'word-token extra';
+                span.textContent = `+${alignItem.hyp}`;
+                span.setAttribute('data-tooltip', 'Extra word spoken');
+            }
             container.appendChild(span);
             container.appendChild(document.createTextNode(' '));
         }
@@ -764,10 +951,7 @@
             container.innerHTML = '';
 
             const events = report.punctuation_pauses?.events || [];
-            if (events.length === 0) {
-                section.classList.add('hidden');
-                return;
-            }
+            if (events.length === 0) { section.classList.add('hidden'); return; }
 
             section.classList.remove('hidden');
 
@@ -775,19 +959,14 @@
                 const div = document.createElement('div');
                 div.className = `event-item ${event.classification}`;
 
-                // Null-safe formatting
                 const pauseStr = (event.pause_sec !== null && event.pause_sec !== undefined)
-                    ? `${event.pause_sec.toFixed(2)}s`
-                    : '—';
+                    ? `${event.pause_sec.toFixed(2)}s` : '—';
                 const expectedStr = event.expected
-                    ? `${event.expected.min}–${event.expected.max}s`
-                    : '—';
+                    ? `${event.expected.min}–${event.expected.max}s` : '—';
                 const scoreStr = (event.score_0_100 !== null && event.score_0_100 !== undefined)
-                    ? event.score_0_100.toFixed(0)
-                    : '—';
+                    ? event.score_0_100.toFixed(0) : '—';
                 const classificationDisplay = event.classification === 'missing'
-                    ? 'word not spoken'
-                    : event.classification;
+                    ? 'word not spoken' : event.classification;
 
                 div.innerHTML = `
                     <strong>"${event.ref_word}"${event.punct}</strong> |
@@ -809,10 +988,7 @@
             container.innerHTML = '';
 
             const events = report.prosody_punctuation?.events || [];
-            if (events.length === 0) {
-                section.classList.add('hidden');
-                return;
-            }
+            if (events.length === 0) { section.classList.add('hidden'); return; }
 
             section.classList.remove('hidden');
 
@@ -821,8 +997,6 @@
                 div.className = `event-item ${event.classification}`;
 
                 const punct = event.punct === '?' ? 'Question' : 'Exclamation';
-
-                // Handle unknown classification and null scores gracefully
                 let classificationDisplay = event.classification;
                 let scoreDisplay;
 
@@ -846,7 +1020,7 @@
         }
 
         // ============================================================
-        // Utility Functions
+        // Utility
         // ============================================================
         function showStatus(element, message, type) {
             element.textContent = message;
@@ -860,6 +1034,7 @@
         btnRecord.addEventListener('click', startRecording);
         btnStop.addEventListener('click', stopRecording);
         btnAnalyze.addEventListener('click', analyzeRecording);
+        audioFileInput.addEventListener('click', () => { audioFileInput.value = ''; });
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             showStatus(recordingStatus, 'Your browser does not support audio recording.', 'error');

@@ -2,12 +2,38 @@
 Pronunciation quality analysis module.
 
 Uses ASR confidence scores and alignment data to estimate pronunciation quality.
+For Hebrew, scoring is more lenient when ASR reliability is low, because Whisper
+base/small models are less calibrated for Hebrew than for English.
 """
 
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Any
 from .align import AlignmentResult, AlignTag
 
+
+# ── ASR reliability thresholds ────────────────────────────────────────────────
+# Hebrew uses lower thresholds: Whisper base is less calibrated for Hebrew,
+# so lower average confidence is still acceptable.
+
+_RELIABILITY = {
+    "he": {
+        "low_conf_word_threshold": 0.65,   # per-word threshold
+        "stable_avg": 0.75,
+        "stable_low_ratio": 0.15,
+        "mixed_avg": 0.58,
+        "mixed_low_ratio": 0.45,
+    },
+    "default": {
+        "low_conf_word_threshold": 0.70,
+        "stable_avg": 0.85,
+        "stable_low_ratio": 0.10,
+        "mixed_avg": 0.70,
+        "mixed_low_ratio": 0.25,
+    },
+}
+
+
+# ── Data structures ───────────────────────────────────────────────────────────
 
 @dataclass
 class PronunciationResult:
@@ -18,6 +44,7 @@ class PronunciationResult:
     low_confidence_words: int
     total_words: int
     notes: List[str]
+    asr_reliability: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -27,70 +54,124 @@ class PronunciationResult:
                 "substitution_severity": round(self.substitution_severity, 4),
                 "low_confidence_word_ratio": round(
                     self.low_confidence_words / max(1, self.total_words), 4
-                )
+                ),
             },
-            "notes": self.notes
+            "asr_reliability": self.asr_reliability,
+            "notes": self.notes,
         }
 
 
+# ── ASR reliability computation ───────────────────────────────────────────────
+
+def compute_asr_reliability(confidences: List[float], lang: str = "en") -> Dict[str, Any]:
+    """
+    Classify ASR reliability as 'stable', 'mixed', or 'unstable'.
+
+    Hebrew uses more lenient thresholds because Whisper is less calibrated
+    for Hebrew than for English or Russian.
+    """
+    if not confidences:
+        return {"avg_confidence": None, "low_confidence_ratio": None, "status": "unknown"}
+
+    cfg = _RELIABILITY.get(lang, _RELIABILITY["default"])
+    low_thresh = cfg["low_conf_word_threshold"]
+
+    avg = sum(confidences) / len(confidences)
+    low_ratio = sum(1 for c in confidences if c < low_thresh) / len(confidences)
+
+    if avg >= cfg["stable_avg"] and low_ratio <= cfg["stable_low_ratio"]:
+        status = "stable"
+    elif avg >= cfg["mixed_avg"] and low_ratio <= cfg["mixed_low_ratio"]:
+        status = "mixed"
+    else:
+        status = "unstable"
+
+    return {
+        "avg_confidence": round(avg, 4),
+        "low_confidence_ratio": round(low_ratio, 4),
+        "status": status,   # "stable" | "mixed" | "unstable" | "unknown"
+    }
+
+
+# ── Main pronunciation analysis ───────────────────────────────────────────────
+
 def analyze_pronunciation(
     alignment: AlignmentResult,
-    confidence_threshold: float = 0.7
+    confidence_threshold: float = 0.7,
+    lang: str = "en",
 ) -> PronunciationResult:
     """
     Analyze pronunciation quality based on ASR output and alignment.
 
-    This is a pragmatic baseline using:
-    - ASR word confidence scores
-    - Substitution patterns as proxy for mispronunciation
-    - Deletion patterns as proxy for unclear speech
+    For Hebrew (lang='he'):
+    - ASR reliability is assessed with Hebrew-specific thresholds.
+    - If ASR is 'unstable', the score is boosted to avoid punishing the reader
+      for recognition errors rather than actual mispronunciations.
+    - near_match and low_confidence_match words (from align.py) are already
+      excluded from substitutions, so they don't double-penalise here.
 
     Args:
         alignment: Word alignment result
-        confidence_threshold: Threshold below which a word is considered low-confidence
+        confidence_threshold: Per-word confidence threshold (fallback; reliability
+                              assessment uses language-specific thresholds internally)
+        lang: Language code ('en', 'ru', 'he')
 
     Returns:
-        PronunciationResult with quality assessment
+        PronunciationResult with quality assessment and ASR reliability block
     """
-    notes = []
+    notes: List[str] = []
 
-    # Extract confidence scores from alignment
-    confidences = []
+    # Collect confidence scores from aligned/substituted words
+    confidences: List[float] = []
+    _SPOKEN_TAGS = {AlignTag.CORRECT, AlignTag.WRONG_WORD, AlignTag.NEAR_MATCH, AlignTag.UNCERTAIN_ASR}
     for word in alignment.alignment:
-        if word.conf is not None and word.tag in [AlignTag.OK, AlignTag.SUB]:
+        if word.conf is not None and word.tag in _SPOKEN_TAGS:
             confidences.append(word.conf)
 
-    total_words = len([w for w in alignment.alignment if w.tag != AlignTag.INS])
+    total_words = len([w for w in alignment.alignment
+                       if w.tag not in (AlignTag.EXTRA, AlignTag.ASR_NOISE)])
+
+    # Compute ASR reliability with language-specific thresholds
+    reliability = compute_asr_reliability(confidences, lang=lang)
 
     if not confidences:
         return PronunciationResult(
-            score_0_100=50.0,  # Neutral score when no data
+            score_0_100=50.0,
             asr_avg_conf=0.0,
             substitution_severity=0.0,
             low_confidence_words=0,
             total_words=total_words,
-            notes=["No confidence data available from ASR"]
+            notes=["No confidence data available from ASR"],
+            asr_reliability=reliability,
         )
 
-    # Calculate average confidence
     avg_conf = sum(confidences) / len(confidences)
-
-    # Count low-confidence words
     low_conf_words = sum(1 for c in confidences if c < confidence_threshold)
-
-    # Calculate substitution severity
-    # Weight substitutions by how different the words might be
     sub_severity = _calculate_substitution_severity(alignment)
 
-    # Calculate pronunciation score
     score = _calculate_pronunciation_score(
-        avg_conf,
-        low_conf_words,
-        len(confidences),
-        sub_severity,
-        alignment,
-        notes
+        avg_conf, low_conf_words, len(confidences), sub_severity, alignment, notes
     )
+
+    # ── Hebrew leniency adjustment ────────────────────────────────────────────
+    # When Hebrew ASR is unreliable, reduce the penalty weight so that
+    # recognition instability does not masquerade as reading mistakes.
+    if lang == "he":
+        status = reliability.get("status", "stable")
+        if status == "unstable":
+            boost = 15
+            score = min(100, score + boost)
+            notes.append(
+                "ASR reliability: unstable — score adjusted upward. "
+                "Some apparent errors likely reflect recognition uncertainty, not mispronunciation."
+            )
+        elif status == "mixed":
+            boost = 7
+            score = min(100, score + boost)
+            notes.append(
+                "ASR reliability: mixed — minor score adjustment applied. "
+                "Uncertain words are treated more leniently."
+            )
 
     return PronunciationResult(
         score_0_100=score,
@@ -98,57 +179,52 @@ def analyze_pronunciation(
         substitution_severity=sub_severity,
         low_confidence_words=low_conf_words,
         total_words=total_words,
-        notes=notes
+        notes=notes,
+        asr_reliability=reliability,
     )
 
 
+# ── Scoring helpers ───────────────────────────────────────────────────────────
+
 def _calculate_substitution_severity(alignment: AlignmentResult) -> float:
     """
-    Calculate severity of substitutions as pronunciation proxy.
-
-    Uses simple character-level distance as proxy for phonetic distance.
+    Calculate severity of substitutions as a pronunciation proxy.
+    Uses character-level edit distance normalised by word length.
+    near_match and low_confidence_match words are excluded — they were
+    already determined to be acceptable by align.py.
     """
     if alignment.substitutions == 0:
         return 0.0
 
-    total_distance = 0
+    total_distance = 0.0
     sub_count = 0
 
     for word in alignment.alignment:
-        if word.tag == AlignTag.SUB and word.ref and word.hyp:
-            # Simple edit distance ratio
+        if word.tag == AlignTag.WRONG_WORD and word.ref and word.hyp:
             ref = word.ref.lower()
             hyp = word.hyp.lower()
-            distance = _levenshtein_distance(ref, hyp)
+            dist = _levenshtein_distance(ref, hyp)
             max_len = max(len(ref), len(hyp))
             if max_len > 0:
-                normalized_distance = distance / max_len
-                total_distance += normalized_distance
+                total_distance += dist / max_len
                 sub_count += 1
 
     return total_distance / sub_count if sub_count > 0 else 0.0
 
 
 def _levenshtein_distance(s1: str, s2: str) -> int:
-    """Calculate Levenshtein distance between two strings."""
+    """Character-level Levenshtein distance."""
     if len(s1) < len(s2):
         return _levenshtein_distance(s2, s1)
-
     if len(s2) == 0:
         return len(s1)
-
-    previous_row = range(len(s2) + 1)
-
+    prev = list(range(len(s2) + 1))
     for i, c1 in enumerate(s1):
-        current_row = [i + 1]
+        curr = [i + 1]
         for j, c2 in enumerate(s2):
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-
-    return previous_row[-1]
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (c1 != c2)))
+        prev = curr
+    return prev[-1]
 
 
 def _calculate_pronunciation_score(
@@ -157,13 +233,11 @@ def _calculate_pronunciation_score(
     total_words: int,
     sub_severity: float,
     alignment: AlignmentResult,
-    notes: List[str]
+    notes: List[str],
 ) -> float:
-    """Calculate overall pronunciation score 0-100."""
-    score = 100.0
+    """Calculate overall pronunciation score 0–100 (before language adjustments)."""
 
     # Confidence component (40% weight)
-    # Average confidence: 0.9+ is excellent, 0.7-0.9 is good, below 0.7 is concerning
     if avg_conf >= 0.9:
         conf_score = 40
     elif avg_conf >= 0.8:
@@ -172,10 +246,10 @@ def _calculate_pronunciation_score(
         conf_score = 30
     elif avg_conf >= 0.6:
         conf_score = 20
-        notes.append("Below average ASR confidence - possible pronunciation issues")
+        notes.append("Below average ASR confidence — possible pronunciation issues")
     else:
         conf_score = 10
-        notes.append("Low ASR confidence - likely pronunciation issues")
+        notes.append("Low ASR confidence — likely pronunciation issues")
 
     # Low-confidence word ratio component (20% weight)
     low_conf_ratio = low_conf_words / max(1, total_words)
@@ -198,26 +272,26 @@ def _calculate_pronunciation_score(
         notes.append("Minor word substitutions detected")
     elif sub_severity < 0.5:
         sub_score = 15
-        notes.append("Moderate word substitutions - possible mispronunciations")
+        notes.append("Moderate word substitutions — possible mispronunciations")
     else:
         sub_score = 5
-        notes.append("Significant substitutions - likely mispronunciations")
+        notes.append("Significant substitutions — likely mispronunciations")
 
     # Deletion component (15% weight)
-    # Deletions might indicate unclear/mumbled speech
-    total_ref = alignment.correct + alignment.deletions + alignment.substitutions
+    total_ref = (alignment.correct + alignment.omitted + alignment.wrong_word +
+                 alignment.near_match + alignment.uncertain_asr)
     if total_ref > 0:
-        del_ratio = alignment.deletions / total_ref
+        del_ratio = alignment.omitted / total_ref
         if del_ratio <= 0.02:
             del_score = 15
         elif del_ratio <= 0.05:
             del_score = 12
         elif del_ratio <= 0.10:
             del_score = 8
-            notes.append("Some words not recognized - may be unclear")
+            notes.append("Some words not recognised — may be unclear")
         else:
             del_score = 3
-            notes.append("Many words not recognized - speech may be unclear")
+            notes.append("Many words not recognised — speech may be unclear")
     else:
         del_score = 15
 
@@ -226,4 +300,4 @@ def _calculate_pronunciation_score(
     if not notes:
         notes.append("Pronunciation appears clear and accurate")
 
-    return min(100, max(0, score))
+    return min(100, max(0, float(score)))

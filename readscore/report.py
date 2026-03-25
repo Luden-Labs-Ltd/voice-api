@@ -194,7 +194,8 @@ def evaluate_reading(
         ref_words,
         hyp_words_final,
         timestamps_final,
-        confidences_final
+        confidences_final,
+        lang=lang_used,
     )
 
     # Step 3: Analyze fluency
@@ -208,7 +209,7 @@ def evaluate_reading(
     prosody = analyze_prosody(audio_path, return_contours=True)
 
     # Step 5: Analyze pronunciation
-    pronunciation = analyze_pronunciation(alignment)
+    pronunciation = analyze_pronunciation(alignment, lang=lang_used)
 
     # Step 6: Analyze punctuation pauses (timing at punctuation boundaries)
     alignment_list = alignment.to_dict()["alignment"]
@@ -259,6 +260,14 @@ def evaluate_reading(
     # Add punctuation prosody if available
     if prosody_punct is not None:
         report["prosody_punctuation"] = prosody_punct.to_dict()
+
+    # Build ASR diagnostics (raw transcript for debugging Hebrew)
+    report["asr_diagnostics"] = {
+        "raw_transcript": " ".join(hyp_words),
+        "word_count_ref": len(ref_words),
+        "word_count_asr": len(hyp_words_final),
+        "avg_confidence": round(sum(confidences_final) / len(confidences_final), 4) if confidences_final else None,
+    }
 
     return report
 

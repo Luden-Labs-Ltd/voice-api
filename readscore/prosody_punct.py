@@ -177,7 +177,7 @@ def map_event_to_alignment(
     target_item = None
 
     for item in alignment:
-        if item.get("tag") in ["ok", "sub", "del"]:
+        if item.get("tag") in ["correct", "wrong_word", "omitted", "near_match", "uncertain_asr"]:
             if ref_count == ref_word_index:
                 target_item = item
                 break
@@ -187,7 +187,7 @@ def map_event_to_alignment(
         return None, None
 
     # Check if we have valid timestamps
-    if target_item.get("tag") == "del":
+    if target_item.get("tag") == "omitted":
         # Deletion - no timestamp, try to find nearest previous with timestamps
         return _find_nearest_timestamp(alignment, ref_word_index)
 
@@ -209,10 +209,10 @@ def _find_nearest_timestamp(
     best_item = None
 
     for item in alignment:
-        if item.get("tag") in ["ok", "sub", "del"]:
+        if item.get("tag") in ["correct", "wrong_word", "omitted", "near_match", "uncertain_asr"]:
             if ref_count >= target_index:
                 break
-            if item.get("t1") is not None and item.get("tag") != "del":
+            if item.get("t1") is not None and item.get("tag") != "omitted":
                 best_item = item
             ref_count += 1
 

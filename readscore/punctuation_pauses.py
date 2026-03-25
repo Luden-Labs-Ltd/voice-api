@@ -148,7 +148,7 @@ def find_alignment_item_by_ref_index(
     ref_count = 0
     for item in alignment:
         # Count reference words (ok, sub, del have ref words)
-        if item.get("tag") in ["ok", "sub", "del"]:
+        if item.get("tag") in ["correct", "wrong_word", "omitted", "near_match", "uncertain_asr"]:
             if ref_count == target_ref_index:
                 return item
             ref_count += 1
@@ -175,17 +175,17 @@ def find_next_spoken_word(
     for item in alignment:
         tag = item.get("tag")
 
-        if tag in ["ok", "sub", "del"]:
+        if tag in ["correct", "wrong_word", "omitted", "near_match", "uncertain_asr"]:
             if ref_count == after_ref_index:
                 found_target = True
             ref_count += 1
 
             # After finding target, look for next spoken word
             if found_target and ref_count > after_ref_index + 1:
-                if tag in ["ok", "sub"] and item.get("t0") is not None:
+                if tag in ["correct", "wrong_word", "near_match", "uncertain_asr"] and item.get("t0") is not None:
                     return item
 
-        elif tag == "ins":
+        elif tag in ("extra", "asr_noise"):
             # Insertions don't have ref index but might be the next spoken
             if found_target and item.get("t0") is not None:
                 return item
@@ -296,7 +296,7 @@ def analyze_punctuation_pauses(
             continue
 
         # Get end time of previous word
-        if prev_item.get("tag") == "del":
+        if prev_item.get("tag") == "omitted":
             event.notes.append("Word was deleted (not spoken)")
             event.classification = "missing"
             classifications["missing"] += 1
