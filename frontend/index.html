@@ -403,6 +403,7 @@
                 <div><strong>Reference:</strong> <span id="diagRef" style="direction: rtl; unicode-bidi: plaintext;"></span></div>
                 <div style="margin-top: 6px;"><strong>Recognized:</strong> <span id="diagTranscript" style="direction: rtl; unicode-bidi: plaintext;"></span></div>
                 <div style="margin-top: 6px;"><strong>Avg Confidence:</strong> <span id="diagConfidence"></span></div>
+                <div style="margin-top: 4px;"><strong>ASR Source:</strong> <span id="diagSource"></span></div>
                 <div style="margin-top: 4px;"><strong>ASR Status:</strong> <span id="diagStatus"></span></div>
                 <div style="margin-top: 4px;"><strong>Ref words:</strong> <span id="diagWordCount"></span></div>
             </div>
@@ -752,11 +753,16 @@
                                    status === 'mixed'  ? '#856404' :
                                    status === 'unstable' ? '#721c24' : '#666';
 
+            const src = diag.asr_source || '—';
+            const srcEl = document.getElementById('diagSource');
+            srcEl.textContent = src;
+            srcEl.style.color = src === 'openai' ? '#155724' : '#856404';
+
             document.getElementById('diagWordCount').textContent =
                 `${diag.word_count_ref} ref / ${diag.word_count_asr} recognized`;
 
-            // Auto-open diagnostics for Hebrew when ASR is not stable
-            if (langUsed === 'he' && status !== 'stable' && status !== '—') {
+            // Auto-open diagnostics for Hebrew when ASR is not stable or is using Whisper
+            if (langUsed === 'he' && (status !== 'stable' || src !== 'openai')) {
                 document.getElementById('asrDiagnosticsDetails').open = true;
             }
         }

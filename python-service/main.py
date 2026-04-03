@@ -11,9 +11,10 @@ Port and model are configured via environment variables:
   WHISPER_MODEL — Whisper model size (default "base")
 """
 
+import json
 import os
 import tempfile
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -33,6 +34,8 @@ async def analyze(
     text: str = Form(...),
     lang: Optional[str] = Form("auto"),
     audio: UploadFile = File(...),
+    transcript: Optional[str] = Form(None),         # Pre-transcribed text from OpenAI
+    transcript_words: Optional[str] = Form(None),   # JSON: [{word, start, end}, ...]
 ):
     text = text.strip()
     if not text:
@@ -58,8 +61,20 @@ async def analyze(
             evaluate_reading,
         )
 
+        # Parse word-level timestamps from OpenAI if provided
+        parsed_words = None
+        if transcript_words:
+            try:
+                parsed_words = json.loads(transcript_words)
+            except Exception:
+                pass  # Malformed JSON — ignore, Python will handle timing itself
+
         config = EvaluationConfig(whisper_model=WHISPER_MODEL)
-        report = evaluate_reading(temp_path, text, config, lang=lang)
+        report = evaluate_reading(
+            temp_path, text, config, lang=lang,
+            transcript=transcript,
+            transcript_words=parsed_words,
+        )
         report = convert_to_serializable(report)
         return JSONResponse(content=report)
 

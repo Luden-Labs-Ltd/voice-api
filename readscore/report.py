@@ -115,11 +115,29 @@ class EvaluationConfig:
             return cls.from_dict(json.load(f))
 
 
+def _get_audio_duration(audio_path: str) -> float:
+    """Return audio duration (seconds) without running ASR transcription."""
+    try:
+        import soundfile as sf
+        info = sf.info(audio_path)
+        return float(info.duration)
+    except Exception:
+        pass
+    try:
+        from pydub import AudioSegment
+        seg = AudioSegment.from_file(audio_path)
+        return len(seg) / 1000.0
+    except Exception:
+        return 0.0
+
+
 def evaluate_reading(
     audio_path: str,
     reference_text: str,
     config: Optional[EvaluationConfig] = None,
-    lang: Optional[str] = None
+    lang: Optional[str] = None,
+    transcript: Optional[str] = None,
+    transcript_words: Optional[List[dict]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate a spoken audio reading against reference text.
@@ -158,20 +176,49 @@ def evaluate_reading(
     if not ref_words:
         raise ValueError("Reference text contains no words after normalization")
 
-    # Step 1: Transcribe audio with Whisper
-    # Pass language to ASR (None for auto-detect by Whisper)
-    asr_language = lang_used if lang_used != "auto" else None
-    transcription = transcribe_audio(
-        audio_path,
-        model_size=config.whisper_model,
-        device=config.whisper_device,
-        language=asr_language
-    )
+    # Step 1: Obtain transcription
+    #
+    # Two paths:
+    #   a) External transcript provided (e.g. OpenAI gpt-4o-transcribe via Node API)
+    #      → skip Whisper, use provided words + timestamps, default confidence = 0.9
+    #   b) No external transcript → run local Whisper ASR (original behaviour)
+    #
+    if transcript is not None:
+        # Path a: use pre-transcribed text from OpenAI
+        if transcript_words:
+            # Word-level timestamps available (OpenAI verbose_json)
+            hyp_words = [w.get("word", "") for w in transcript_words]
+            timestamps = [
+                (float(w.get("start", 0.0)), float(w.get("end", 0.0)))
+                for w in transcript_words
+            ]
+            duration = float(transcript_words[-1].get("end", 0.0)) if transcript_words else 0.0
+        else:
+            # No word timestamps — split text, generate placeholder timing
+            hyp_words = transcript.split()
+            timestamps = [(0.0, 0.0)] * len(hyp_words)
+            duration = _get_audio_duration(audio_path)
 
-    # Extract word data
-    hyp_words, timestamps, confidences = get_word_data(transcription)
+        # OpenAI does not provide per-word confidence; use a high default so
+        # that the Hebrew leniency system does not penalise OpenAI mismatches.
+        confidences = [0.9] * len(hyp_words)
+        raw_transcript = transcript
+        asr_source = "openai"
+    else:
+        # Path b: local Whisper ASR
+        asr_language = lang_used if lang_used != "auto" else None
+        transcription = transcribe_audio(
+            audio_path,
+            model_size=config.whisper_model,
+            device=config.whisper_device,
+            language=asr_language
+        )
+        hyp_words, timestamps, confidences = get_word_data(transcription)
+        duration = transcription.duration
+        raw_transcript = " ".join(hyp_words)
+        asr_source = "whisper"
 
-    # Normalize hypothesis words for alignment (with language)
+    # Normalize hypothesis words for alignment
     word_data = []
     for i, word in enumerate(hyp_words):
         normalized = normalize_word(word, lang=lang_used)
@@ -201,7 +248,7 @@ def evaluate_reading(
     # Step 3: Analyze fluency
     fluency = analyze_fluency(
         timestamps_final,
-        transcription.duration,
+        duration,
         config.fluency
     )
 
@@ -245,10 +292,11 @@ def evaluate_reading(
         "input": {
             "audio": os.path.basename(audio_path),
             "text_len_words": len(ref_words),
-            "duration_sec": round(transcription.duration, 2),
+            "duration_sec": round(duration, 2),
             "reference_text": reference_text,  # Include for UI rendering
             "lang_requested": lang_requested,
-            "lang_used": lang_used
+            "lang_used": lang_used,
+            "asr_source": asr_source,
         },
         "accuracy": alignment.to_dict(),
         "fluency_speed": fluency.to_dict(),
@@ -263,7 +311,8 @@ def evaluate_reading(
 
     # Build ASR diagnostics (raw transcript for debugging Hebrew)
     report["asr_diagnostics"] = {
-        "raw_transcript": " ".join(hyp_words),
+        "raw_transcript": raw_transcript,
+        "asr_source": asr_source,
         "word_count_ref": len(ref_words),
         "word_count_asr": len(hyp_words_final),
         "avg_confidence": round(sum(confidences_final) / len(confidences_final), 4) if confidences_final else None,
