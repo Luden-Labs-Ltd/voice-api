@@ -49,6 +49,35 @@ const openaiClient = OPENAI_API_KEY
 // Map our lang codes to ISO 639-1 codes accepted by OpenAI.
 const LANG_ISO: Record<string, string> = { he: "he", en: "en", ru: "ru" };
 
+const OPENAI_AUDIO_EXTS = new Set([
+  ".mp3",
+  ".mp4",
+  ".mpeg",
+  ".mpga",
+  ".m4a",
+  ".wav",
+  ".webm",
+]);
+
+/** Расширение tempfile для OpenAI: mimetype надёжнее filename (фронт раньше слал webm как .wav). */
+function extensionForOpenAIUpload(
+  filename: string,
+  mime?: string
+): string {
+  const m = (mime || "").toLowerCase();
+  if (m.includes("webm")) return ".webm";
+  if (m.includes("wav")) return ".wav";
+  if (m.includes("mp3") || m.includes("mpeg")) return ".mp3";
+  if (m.includes("mp4")) return ".mp4";
+  if (m.includes("m4a")) return ".m4a";
+  if (m.includes("mpga")) return ".mpga";
+
+  const ext = path.extname(filename).toLowerCase();
+  if (OPENAI_AUDIO_EXTS.has(ext)) return ext;
+
+  return ".webm";
+}
+
 if (!openaiClient) {
   fastify.log.info("OPENAI_API_KEY not set — will use Python Whisper ASR for all requests");
 }
@@ -58,11 +87,12 @@ if (!openaiClient) {
 async function transcribeWithOpenAI(
   buffer: Buffer,
   filename: string,
+  mime: string | undefined,
   lang: string | undefined
 ): Promise<string | null> {
   if (!openaiClient) return null;
 
-  const ext = path.extname(filename) || ".wav";
+  const ext = extensionForOpenAIUpload(filename, mime);
   const tempPath = path.join(os.tmpdir(), `rs-${randomUUID()}${ext}`);
 
   try {
@@ -144,7 +174,12 @@ fastify.post("/api/analyze", async (request, reply) => {
   // On failure / no key: Python runs local Whisper ASR instead.
   let openaiTranscript: string | null = null;
   try {
-    openaiTranscript = await transcribeWithOpenAI(audioBuffer, audioFilename, lang);
+    openaiTranscript = await transcribeWithOpenAI(
+      audioBuffer,
+      audioFilename,
+      audioMimetype,
+      lang
+    );
   } catch (err) {
     fastify.log.warn({ asr: "openai", err }, "OpenAI transcription failed — falling back to Python Whisper ASR");
   }
